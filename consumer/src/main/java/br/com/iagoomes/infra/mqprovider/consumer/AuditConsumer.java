@@ -1,7 +1,6 @@
 package br.com.iagoomes.infra.mqprovider.consumer;
 
 import br.com.iagoomes.domain.dto.FixedIncomeEventDto;
-import br.com.iagoomes.infra.config.RabbitMQFanoutConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
@@ -10,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuditConsumer {
 
-    @RabbitListener(queues = RabbitMQFanoutConfig.AUDIT_QUEUE)
+    @RabbitListener(queues = "#{rabbitMQProperties.queues.audit.name}")
     public void handleAuditEvent(FixedIncomeEventDto event) {
         try {
             log.info("📝 [AUDIT CONSUMER] Received event: {}", event.getEventType());

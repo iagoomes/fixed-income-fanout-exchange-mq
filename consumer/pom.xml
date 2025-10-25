@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>consumer</artifactId>
-    <n>Consumer</n>
+    <name>Consumer</name>
     <description>Multiple Consumers para receber eventos</description>
 
     <properties>

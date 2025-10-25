@@ -1,73 +1,72 @@
 package br.com.iagoomes.infra.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.core.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@RequiredArgsConstructor
 public class RabbitMQFanoutConfig {
 
-    // Exchange
-    public static final String FANOUT_EXCHANGE = "rf-events.fanout";
-
-    // Queues
-    public static final String RATE_QUEUE = "rf.rate.queue";
-    public static final String PRICING_QUEUE = "rf.pricing.queue";
-    public static final String NOTIFICATIONS_QUEUE = "rf.notifications.queue";
-    public static final String AUDIT_QUEUE = "rf.audit.queue";
+    private final RabbitMQProperties rabbitMQProperties;
 
     // Fanout Exchange Bean
     @Bean
     public FanoutExchange fixedIncomeFanoutExchange() {
-        return new FanoutExchange(FANOUT_EXCHANGE, true, false);
+        return new FanoutExchange(
+                rabbitMQProperties.getExchange().getName(),
+                rabbitMQProperties.getExchange().isDurable(),
+                rabbitMQProperties.getExchange().isAutoDelete()
+        );
     }
 
     // Rate Queue
     @Bean
     public Queue rateQueue() {
-        return new Queue(RATE_QUEUE, true);
+        RabbitMQProperties.QueueConfig config = rabbitMQProperties.getQueues().getRate();
+        return new Queue(config.getName(), config.isDurable(), config.isExclusive(), config.isAutoDelete());
     }
 
     @Bean
-    public Binding rateBinding(Queue rateQueue, FanoutExchange fanoutExchange) {
-        return BindingBuilder.bind(rateQueue)
-                .to(fanoutExchange);
+    public Binding rateBinding(Queue rateQueue, FanoutExchange fixedIncomeFanoutExchange) {
+        return BindingBuilder.bind(rateQueue).to(fixedIncomeFanoutExchange);
     }
 
     // Pricing Queue
     @Bean
     public Queue pricingQueue() {
-        return new Queue(PRICING_QUEUE, true);
+        RabbitMQProperties.QueueConfig config = rabbitMQProperties.getQueues().getPricing();
+        return new Queue(config.getName(), config.isDurable(), config.isExclusive(), config.isAutoDelete());
     }
 
     @Bean
-    public Binding pricingBinding(Queue pricingQueue, FanoutExchange fanoutExchange) {
-        return BindingBuilder.bind(pricingQueue)
-                .to(fanoutExchange);
+    public Binding pricingBinding(Queue pricingQueue, FanoutExchange fixedIncomeFanoutExchange) {
+        return BindingBuilder.bind(pricingQueue).to(fixedIncomeFanoutExchange);
     }
 
     // Notifications Queue
     @Bean
     public Queue notificationsQueue() {
-        return new Queue(NOTIFICATIONS_QUEUE, true);
+        RabbitMQProperties.QueueConfig config = rabbitMQProperties.getQueues().getNotifications();
+        return new Queue(config.getName(), config.isDurable(), config.isExclusive(), config.isAutoDelete());
     }
 
     @Bean
-    public Binding notificationsBinding(Queue notificationsQueue, FanoutExchange fanoutExchange) {
-        return BindingBuilder.bind(notificationsQueue)
-                .to(fanoutExchange);
+    public Binding notificationsBinding(Queue notificationsQueue, FanoutExchange fixedIncomeFanoutExchange) {
+        return BindingBuilder.bind(notificationsQueue).to(fixedIncomeFanoutExchange);
     }
 
     // Audit Queue
     @Bean
     public Queue auditQueue() {
-        return new Queue(AUDIT_QUEUE, true);
+        RabbitMQProperties.QueueConfig config = rabbitMQProperties.getQueues().getAudit();
+        return new Queue(config.getName(), config.isDurable(), config.isExclusive(), config.isAutoDelete());
     }
 
     @Bean
-    public Binding auditBinding(Queue auditQueue, FanoutExchange fanoutExchange) {
-        return BindingBuilder.bind(auditQueue)
-                .to(fanoutExchange);
+    public Binding auditBinding(Queue auditQueue, FanoutExchange fixedIncomeFanoutExchange) {
+        return BindingBuilder.bind(auditQueue).to(fixedIncomeFanoutExchange);
     }
 
 }

@@ -1,7 +1,6 @@
 package br.com.iagoomes.infra.mqprovider.consumer;
 
 import br.com.iagoomes.domain.dto.FixedIncomeEventDto;
-import br.com.iagoomes.infra.config.RabbitMQFanoutConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
@@ -10,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class RateConsumer {
 
-    @RabbitListener(queues = RabbitMQFanoutConfig.RATE_QUEUE)
+    @RabbitListener(queues = "#{rabbitMQProperties.queues.rate.name}")
     public void handleRateChangeEvent(FixedIncomeEventDto event) {
         try {
             log.info("🏠 [RATE CONSUMER] Received event: {}", event.getEventType());

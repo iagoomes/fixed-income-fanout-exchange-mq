@@ -123,7 +123,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--consumer.type=audit"
 ### Producer
 
 ```
-producer/src/main/java/br/com/iagoomes/producer/
+producer/src/main/java/br/com/iagoomes/
 ├── ProducerApplication.java
 ├── application/
 │   ├── controller/
@@ -134,7 +134,8 @@ producer/src/main/java/br/com/iagoomes/producer/
 │   └── FixedIncomeEventDto.java
 └── infra/
     ├── config/
-    │   └── RabbitMQFanoutConfig.java
+    │   ├── RabbitMQFanoutConfig.java
+    │   └── RabbitMQProperties.java ⭐ (nova)
     └── mqprovider/producer/
         └── FixedIncomeEventProducer.java
 ```
@@ -142,13 +143,14 @@ producer/src/main/java/br/com/iagoomes/producer/
 ### Consumer
 
 ```
-consumer/src/main/java/br/com/iagoomes/consumer/
+consumer/src/main/java/br/com/iagoomes/
 ├── ConsumerApplication.java
 ├── domain/dto/
 │   └── FixedIncomeEventDto.java
 └── infra/
     ├── config/
-    │   └── RabbitMQFanoutConfig.java
+    │   ├── RabbitMQFanoutConfig.java
+    │   └── RabbitMQProperties.java ⭐ (nova)
     └── mqprovider/consumer/
         ├── RateConsumer.java
         ├── PricingConsumer.java
@@ -397,46 +399,224 @@ Acesse: [http://localhost:15672](http://localhost:15672)
 
 ## ⚙️ Configuração
 
+### 📝 Abordagem de Configuração Moderna
+
+Este projeto utiliza uma abordagem **moderna e profissional** de configuração RabbitMQ, seguindo as melhores práticas do Spring Boot.
+
+#### 🔄 Comparação: Tradicional vs Moderna
+
+**❌ Abordagem Tradicional (hardcoded):**
+```java
+@Configuration
+public class RabbitMQFanoutConfig {
+    // Valores fixos no código
+    public static final String FANOUT_EXCHANGE = "rf-events.fanout";
+    public static final String RATE_QUEUE = "rf.rate.queue";
+
+    @Bean
+    public FanoutExchange fixedIncomeFanoutExchange() {
+        return new FanoutExchange(FANOUT_EXCHANGE, true, false);
+    }
+}
+```
+
+**Problemas:**
+- Valores fixos no código
+- Precisa recompilar para mudar
+- Difícil ter configs diferentes por ambiente
+- Não segue 12-factor app
+
+**✅ Abordagem Moderna (externalizada) - USADA NESTE PROJETO:**
+```java
+@Configuration
+@RequiredArgsConstructor
+public class RabbitMQFanoutConfig {
+    private final RabbitMQProperties rabbitMQProperties;
+
+    @Bean
+    public FanoutExchange fixedIncomeFanoutExchange() {
+        return new FanoutExchange(
+            rabbitMQProperties.getExchange().getName(),
+            rabbitMQProperties.getExchange().isDurable(),
+            rabbitMQProperties.getExchange().isAutoDelete()
+        );
+    }
+}
+```
+
+**Benefícios:**
+- ✅ Configuração externalizada no `application.yml`
+- ✅ Diferentes valores por ambiente (dev, staging, prod)
+- ✅ Substituível por variáveis de ambiente
+- ✅ Type-safe com `@ConfigurationProperties`
+- ✅ Validação em tempo de compilação
+- ✅ Auto-complete na IDE
+- ✅ Segue 12-factor app
+- ✅ Facilita testes unitários (mock das properties)
+
+#### 📦 Classe de Propriedades Tipada
+
+**RabbitMQProperties.java:**
+```java
+@Getter
+@Setter
+@Configuration
+@ConfigurationProperties(prefix = "rabbitmq")
+public class RabbitMQProperties {
+    private Exchange exchange = new Exchange();
+    private Queues queues = new Queues();
+
+    @Getter
+    @Setter
+    public static class Exchange {
+        private String name;
+        private String type = "fanout";
+        private boolean durable = true;
+        private boolean autoDelete = false;
+    }
+
+    @Getter
+    @Setter
+    public static class Queues {
+        private QueueConfig rate = new QueueConfig();
+        private QueueConfig pricing = new QueueConfig();
+        private QueueConfig notifications = new QueueConfig();
+        private QueueConfig audit = new QueueConfig();
+    }
+
+    @Getter
+    @Setter
+    public static class QueueConfig {
+        private String name;
+        private boolean durable = true;
+        private boolean exclusive = false;
+        private boolean autoDelete = false;
+    }
+}
+```
+
 ### application.yml
 
 ```yaml
 spring:
+  application:
+    name: producer-api  # ou consumer-api
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
 
-fixed-income:
-  fanout:
-    exchange:
-      name: rf-events.fanout
+# RabbitMQ Topology Configuration
+rabbitmq:
+  exchange:
+    name: ${RABBITMQ_EXCHANGE_NAME:fixed-income.events.fanout}
+    type: fanout
+    durable: true
+    auto-delete: false
+
+  queues:
+    rate:
+      name: ${RABBITMQ_QUEUE_RATE:fixed-income.events.rate}
       durable: true
-    queues:
-      rate:
-        name: rf.rate.queue
-        durable: true
-      pricing:
-        name: rf.pricing.queue
-        durable: true
-      notifications:
-        name: rf.notifications.queue
-        durable: true
-      audit:
-        name: rf.audit.queue
-        durable: true
+      exclusive: false
+      auto-delete: false
+
+    pricing:
+      name: ${RABBITMQ_QUEUE_PRICING:fixed-income.events.pricing}
+      durable: true
+      exclusive: false
+      auto-delete: false
+
+    notifications:
+      name: ${RABBITMQ_QUEUE_NOTIFICATIONS:fixed-income.events.notifications}
+      durable: true
+      exclusive: false
+      auto-delete: false
+
+    audit:
+      name: ${RABBITMQ_QUEUE_AUDIT:fixed-income.events.audit}
+      durable: true
+      exclusive: false
+      auto-delete: false
 ```
 
-### Variáveis de Ambiente
+### 🏷️ Nomenclatura de Filas (Best Practices)
 
-Você pode sobrescrever as configurações via variáveis de ambiente:
+O projeto segue as **melhores práticas de nomenclatura RabbitMQ**:
 
+**Padrão adotado:** `{domain}.{purpose}.{consumer}`
+
+| Componente | Nome | Descrição |
+|------------|------|-----------|
+| **Exchange** | `fixed-income.events.fanout` | Domínio claro e descritivo |
+| **Queue Rate** | `fixed-income.events.rate` | Hierárquica e auto-explicativa |
+| **Queue Pricing** | `fixed-income.events.pricing` | Facilita identificação |
+| **Queue Notifications** | `fixed-income.events.notifications` | Evita abreviações confusas |
+| **Queue Audit** | `fixed-income.events.audit` | Padrão consistente |
+
+**Por que essa nomenclatura é melhor:**
+- ✅ Descritiva e auto-documentada
+- ✅ Evita abreviações (`fixed-income` ao invés de `rf`)
+- ✅ Hierárquica (facilita filtros e pesquisas)
+- ✅ Padrão consistente em toda topologia
+- ✅ Multi-tenant friendly (fácil adicionar prefixos de ambiente)
+
+### 🌍 Variáveis de Ambiente
+
+#### Desenvolvimento Local (valores padrão)
+Não precisa configurar nada, use os valores padrão do `application.yml`.
+
+#### Produção (sobrescrever via env vars)
 ```bash
-SPRING_RABBITMQ_HOST=rabbitmq
-SPRING_RABBITMQ_PORT=5672
-SPRING_RABBITMQ_USERNAME=guest
-SPRING_RABBITMQ_PASSWORD=guest
+# Conexão RabbitMQ
+export SPRING_RABBITMQ_HOST=rabbitmq-prod.company.com
+export SPRING_RABBITMQ_PORT=5672
+export SPRING_RABBITMQ_USERNAME=prod-user
+export SPRING_RABBITMQ_PASSWORD=secure-password
+
+# Topologia RabbitMQ
+export RABBITMQ_EXCHANGE_NAME=prod.fixed-income.events.fanout
+export RABBITMQ_QUEUE_RATE=prod.fixed-income.events.rate
+export RABBITMQ_QUEUE_PRICING=prod.fixed-income.events.pricing
+export RABBITMQ_QUEUE_NOTIFICATIONS=prod.fixed-income.events.notifications
+export RABBITMQ_QUEUE_AUDIT=prod.fixed-income.events.audit
 ```
+
+#### Staging/Homologação
+```bash
+export RABBITMQ_EXCHANGE_NAME=staging.fixed-income.events.fanout
+export RABBITMQ_QUEUE_RATE=staging.fixed-income.events.rate
+# ... demais filas
+```
+
+#### Via Linha de Comando
+```bash
+java -jar producer.jar \
+  --rabbitmq.exchange.name=custom.exchange \
+  --rabbitmq.queues.rate.name=custom.rate.queue
+```
+
+### 🎯 Uso nos Consumers com SpEL
+
+Os consumers utilizam **Spring Expression Language (SpEL)** para ler as configurações dinamicamente:
+
+```java
+@Component
+public class RateConsumer {
+
+    @RabbitListener(queues = "#{rabbitMQProperties.queues.rate.name}")
+    public void handleRateChangeEvent(FixedIncomeEventDto event) {
+        // Processa evento
+    }
+}
+```
+
+**Benefícios do SpEL:**
+- Configuração dinâmica em runtime
+- Mesma fonte de verdade (application.yml)
+- Fácil manutenção
+- Sem duplicação de strings
 
 ## 🔧 Troubleshooting
 
@@ -542,6 +722,12 @@ Fanout para:
 ✅ Escalabilidade horizontal de consumers
 ✅ Diferenças: Direct vs Topic vs Fanout
 ✅ Casos de uso reais em renda fixa
+✅ **@ConfigurationProperties** para configuração type-safe
+✅ **Externalização de configurações** com application.yml
+✅ **SpEL (Spring Expression Language)** nos @RabbitListener
+✅ **Nomenclatura de filas** seguindo best practices
+✅ **12-factor app** com configurações por ambiente
+✅ **Arquitetura profissional** pronta para produção
 
 ## 📚 Série de Exercícios
 

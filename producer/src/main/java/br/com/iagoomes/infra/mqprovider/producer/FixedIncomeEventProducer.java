@@ -1,7 +1,7 @@
 package br.com.iagoomes.infra.mqprovider.producer;
 
 import br.com.iagoomes.domain.dto.FixedIncomeEventDto;
-import br.com.iagoomes.infra.config.RabbitMQFanoutConfig;
+import br.com.iagoomes.infra.config.RabbitMQProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -15,6 +15,7 @@ import java.util.UUID;
 public class FixedIncomeEventProducer {
 
     private final RabbitTemplate rabbitTemplate;
+    private final RabbitMQProperties rabbitMQProperties;
 
     public void publishEvent(FixedIncomeEventDto event) {
         try {
@@ -27,12 +28,13 @@ public class FixedIncomeEventProducer {
 
             // Publica no Fanout Exchange (sem routing key!)
             rabbitTemplate.convertAndSend(
-                    RabbitMQFanoutConfig.FANOUT_EXCHANGE,
+                    rabbitMQProperties.getExchange().getName(),
                     "",  // Empty routing key for fanout
                     event
             );
 
-            log.info("Event published successfully to Fanout Exchange");
+            log.info("Event published successfully to Fanout Exchange: {}",
+                    rabbitMQProperties.getExchange().getName());
 
         } catch (Exception e) {
             log.error("Error publishing event: {}", event.getEventType(), e);

@@ -10,6 +10,39 @@ spring:
 server:
   port: 8080
 
+# RabbitMQ Topology Configuration
+rabbitmq:
+  exchange:
+    name: ${RABBITMQ_EXCHANGE_NAME:fixed-income.events.fanout}
+    type: fanout
+    durable: true
+    auto-delete: false
+
+  queues:
+    rate:
+      name: ${RABBITMQ_QUEUE_RATE:fixed-income.events.rate}
+      durable: true
+      exclusive: false
+      auto-delete: false
+
+    pricing:
+      name: ${RABBITMQ_QUEUE_PRICING:fixed-income.events.pricing}
+      durable: true
+      exclusive: false
+      auto-delete: false
+
+    notifications:
+      name: ${RABBITMQ_QUEUE_NOTIFICATIONS:fixed-income.events.notifications}
+      durable: true
+      exclusive: false
+      auto-delete: false
+
+    audit:
+      name: ${RABBITMQ_QUEUE_AUDIT:fixed-income.events.audit}
+      durable: true
+      exclusive: false
+      auto-delete: false
+
 logging:
   level:
     root: INFO
